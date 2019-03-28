@@ -13,7 +13,8 @@ class Puff(object): #r_sq becomes the square's radius
         self.y += self.velocity[1]*dt
 
 class Flies(object):
-    def __init__(self,x,y,velocity,grid_prob,ampl_const,puffs,detection_threshold,use_grid=True):
+    def __init__(self,x,y,velocity,grid_prob,ampl_const,puffs,
+        detection_threshold,conc_fun,use_grid=True):
         self.x = x
         self.y = y
         self.velocity = velocity
@@ -24,6 +25,7 @@ class Flies(object):
         self.ampl_const = ampl_const
         self.puffs = puffs
         self.detection_threshold = detection_threshold
+        self.conc_fun = conc_fun
     def update(self,dt,t,conc_info,conc_sample_rate=None,xmin=None,ymin=None):
         #update positions
         self.x += self.velocity[0]*dt
@@ -41,8 +43,14 @@ class Flies(object):
 
         else:
             #compute values for each fly anew; conc_info is the puffs list
-            px,py,r_sq = np.array([(puff.x, puff.y, puff.r_sq) for puff in self.puffs]).T
-            fly_concs = np.sum(compute_sq_puff_val(self.ampl_const,
+            try:
+                px,py,r_sq = np.array([(puff.x, puff.y, puff.r_sq) for puff in self.puffs]).T
+            except(AttributeError): #adjustment to make compatible with pompy plumes
+                puffs_reshaped = self.puffs.reshape(-1,self.puffs.shape[-1])
+                px, py, _, r_sq = puffs_reshaped[~np.isnan(puffs_reshaped[:, 0]), :].T
+
+
+            fly_concs = np.sum(self.conc_fun(self.ampl_const,
                 px[:,None],py[:,None],r_sq[:,None],self.x[None,:],self.y[None,:]),axis=0)
 
         #Determine which flies have been caught

@@ -11,11 +11,10 @@ from utility import compute_Gaussian,compute_sq_puff_val
 
 
 ampl_const = 1.
-detection_threshold = 0.5
 
-dt = 0.01
+dt = 0.25
 t = 0.
-release_rate = 2.
+release_rate = 10.
 
 x_stretch=4.
 xmin,xmax = 0.,x_stretch*16.
@@ -23,10 +22,12 @@ ymin,ymax = -1.1,1.1
 
 
 sim_time = 100*60.
-puff_x_vel,puff_y_vel =2.,0. #current setup requires these >=1.
-puff_r_sq = .5
+puff_x_vel,puff_y_vel =1.,0. #current setup requires these >=1.
+puff_r_sq = (0.01)**2
 puff_buffer_time = xmax/puff_x_vel
 stop_puffs = False
+
+detection_threshold = compute_Gaussian(ampl_const,0,0,puff_r_sq,puff_r_sq,0) #value the puff takes at distance r_sq
 
 num_flies = 1000
 fly_velocity = np.array([0.,-1.])
@@ -67,9 +68,9 @@ plt.colorbar(conc_im,ax=ax1)
 fly_x_0,fly_y_0 = np.linspace(xmin,xmax-0.001,num_flies),ymax*np.ones(num_flies)
 
 flies1 = Flies(fly_x_0,fly_y_0,fly_velocity,False,ampl_const,puffs,
-    detection_threshold,compute_sq_puff_val,use_grid=False)
-flies2 = Flies(np.copy(fly_x_0),np.copy(fly_y_0),fly_velocity,True,ampl_const,puffs,
-    detection_threshold,compute_sq_puff_val,use_grid=True)
+    detection_threshold,compute_Gaussian,use_grid=False)
+flies2 = Flies(np.copy(fly_x_0),np.copy(fly_y_0),fly_velocity,True,
+    ampl_const,puffs,detection_threshold,compute_Gaussian,use_grid=True)
 
 
 edgecolor_dict = {0 : 'red', 1 : 'white'}
@@ -139,7 +140,7 @@ while t<sim_time:
 #    if t>0:
         #update concentration grid
         px,py,r_sq = np.array([(puff.x, puff.y, puff.r_sq) for puff in puffs]).T
-        conc_grid =  compute_sq_puff_val(ampl_const,
+        conc_grid =  compute_Gaussian(ampl_const,
             px[:,na,na],py[:,na,na],r_sq[:,na,na],
                 conc_sample_grid_x[na,:,:],conc_sample_grid_y[na,:,:])
         conc_grid = np.sum(conc_grid,axis=0)
@@ -151,16 +152,24 @@ while t<sim_time:
 
 
         #Once the average value has been computed, perform the necessary adjustments
-        if np.abs(t-(puff_buffer_time+fly_buffer_time))<0.001:
-            #step one: moving particle adjustments
-            period_length = release_rate*puff_x_vel
-            add_factor = (puff_x_vel*((2*puff_r_sq)/(np.abs(fly_velocity[1])))/(period_length))
-            conc_cumul_prob[conc_cumul_prob>0.] = conc_cumul_prob[conc_cumul_prob>0.] + add_factor
-
-
-            #step two: bernoulli trial adjustments
-            n = (2*puff_r_sq)/(np.abs(fly_velocity[1]))/dt #Number of intersections
-            conc_cumul_prob[conc_cumul_prob>0.] = 1.-(1.-conc_cumul_prob[conc_cumul_prob>0.])**(1./n)
+        # if np.abs(t-(puff_buffer_time+fly_buffer_time))<0.001:
+        #     #step one: moving particle adjustments
+        #     period_length = release_rate*puff_x_vel
+        #     #first approximation step to adjust for circle vs. square: divide height by two
+        #     #if fly_velocity>=puff velocity
+        #     if (np.abs(fly_velocity[1])>=puff_x_vel):
+        #         add_factor = (puff_x_vel*((puff_r_sq)/(np.abs(fly_velocity[1])))/(period_length))
+        #     else:
+        #         print('past half height')
+        #         time.sleep(1)
+        #         add_factor = (puff_x_vel*(1.5*(puff_r_sq)/(np.abs(fly_velocity[1])))/(period_length))
+        #
+        #     conc_cumul_prob[conc_cumul_prob>0.] = conc_cumul_prob[conc_cumul_prob>0.] + add_factor
+        #
+        #
+        #     #step two: bernoulli trial adjustments
+        #     n = (2*puff_r_sq)/(np.abs(fly_velocity[1]))/dt #Number of intersections
+        #     conc_cumul_prob[conc_cumul_prob>0.] = 1.-(1.-conc_cumul_prob[conc_cumul_prob>0.])**(1./n)
 
 
         if t>puff_buffer_time+fly_buffer_time:
@@ -170,10 +179,13 @@ while t<sim_time:
 
             #time.sleep(0.1)
     #update flies
-        if t>puff_buffer_time+fly_buffer_time:
+        if t>puff_buffer_time:#+fly_buffer_time:
             timer.set_text(str(t)+' s')
             line.set_ydata(conc_cumul_prob[int(ymax/conc_sample_rate),:])
             conc_im.set_data(conc_grid)
+            plt.pause(0.001)
+        if t>puff_buffer_time+fly_buffer_time:
+            # conc_im.set_data(conc_grid>detection_threshold)
             plt.pause(0.001)
 
 
