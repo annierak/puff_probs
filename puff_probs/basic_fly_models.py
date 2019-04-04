@@ -46,7 +46,7 @@ class Flies(object):
             try:
                 px,py,r_sq = np.array([(puff.x, puff.y, puff.r_sq) for puff in self.puffs]).T
             except(AttributeError): #adjustment to make compatible with pompy plumes
-                puffs_reshaped = self.puffs.reshape(-1,self.puffs.shape[-1])
+                puffs_reshaped = conc_info.reshape(-1,conc_info.shape[-1])
                 px, py, _, r_sq = puffs_reshaped[~np.isnan(puffs_reshaped[:, 0]), :].T
 
 
